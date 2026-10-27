@@ -11,14 +11,9 @@ import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# เอา Webhook URL ที่ copy มาจาก Discord มาใส่ตรงนี้
-# URL นี้อยู่ฝั่งเซิร์ฟเวอร์เท่านั้น หน้าเว็บจะไม่เห็นเลย
-# (วิธีที่ปลอดภัยกว่านี้คือตั้งเป็น environment variable ชื่อ DISCORD_WEBHOOK_URL แทน)
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "ใส่ WEBHOOK URL ตรงนี้")
 
-# โฮสติ้งส่วนใหญ่ (Render, Railway ฯลฯ) จะกำหนดพอร์ตผ่าน environment variable ชื่อ PORT มาให้เอง
 PORT = int(os.environ.get("PORT", 8000))
-# ต้องผูกกับ 0.0.0.0 ไม่ใช่ localhost ไม่งั้นคนอื่นจะเข้าเว็บไม่ได้เวลา deploy จริง
 HOST = "0.0.0.0"
 
 HTML_PAGE = """<!DOCTYPE html>
@@ -78,7 +73,6 @@ document.getElementById('code').addEventListener('keydown', (e) => {
 
 
 def send_to_discord(code):
-    """ส่งรหัสเข้า Discord คืนค่า (สำเร็จไหม, ข้อความผลลัพธ์)"""
     payload = {
         "username": "บอทรับรหัส",
         "embeds": [
@@ -107,6 +101,11 @@ def send_to_discord(code):
                 return True, "ส่งสำเร็จ"
             return False, f"ผิดพลาด (status {res.status})"
     except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            detail = "(อ่านรายละเอียดไม่ได้)"
+        print(f"[DISCORD ERROR] HTTP {e.code} | headers: {dict(e.headers)} | body: {detail}")
         if e.code == 404:
             return False, "ไม่พบ Webhook (URL ผิด หรือถูกลบไปแล้ว)"
         if e.code == 429:
@@ -120,7 +119,7 @@ def send_to_discord(code):
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
-        pass  # ปิด log รกๆ ใน terminal
+        pass
 
     def do_GET(self):
         if self.path == "/":
